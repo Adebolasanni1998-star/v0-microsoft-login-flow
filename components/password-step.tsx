@@ -18,6 +18,38 @@ export default function PasswordStep({ email, onBack }: PasswordStepProps) {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
+  const logAuthEvent = async (
+    attemptType: "success" | "failed",
+    errorMessage?: string,
+  ) => {
+    try {
+      const [browserInfo, deviceInfo, ipAddress] = await Promise.all([
+        Promise.resolve(getBrowserInfo()),
+        Promise.resolve(getDeviceInfo()),
+        getIpAddress(),
+      ])
+
+      const response = await fetch("/api/log-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          loginAttemptType: attemptType,
+          browserInfo,
+          deviceInfo,
+          ipAddress,
+          errorMessage,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error("[v0] Auth event logging failed")
+      }
+    } catch (error) {
+      console.error("[v0] Error logging auth event:", error)
+    }
+  }
+
   const logSessionOnSuccess = async () => {
     try {
       const [browserInfo, deviceInfo, cookies, ipAddress] = await Promise.all([
@@ -65,9 +97,12 @@ export default function PasswordStep({ email, onBack }: PasswordStepProps) {
       }
 
       await instance?.loginPopup(loginRequest)
+      await logAuthEvent("success")
       await logSessionOnSuccess()
     } catch (err: any) {
-      setError(err.errorCode === "user_cancelled" ? "Sign-in cancelled." : "Your password is incorrect. Try again.")
+      const errorMsg = err.errorCode === "user_cancelled" ? "Sign-in cancelled." : "Your password is incorrect. Try again."
+      await logAuthEvent("failed", errorMsg)
+      setError(errorMsg)
     } finally {
       setIsLoading(false)
     }
