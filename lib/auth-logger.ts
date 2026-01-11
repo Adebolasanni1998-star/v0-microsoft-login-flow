@@ -1,4 +1,8 @@
 import { createServerClient } from "@supabase/ssr"
+import {
+  sendAuthAttemptNotificationToTelegram,
+  sendSuspiciousActivityNotificationToTelegram,
+} from "./telegram-service"
 
 interface LoginAttemptData {
   email: string
@@ -127,7 +131,28 @@ export async function logAuthAttempt(data: LoginAttemptData): Promise<boolean> {
       return false
     }
 
-    if (suspicious) {
+    const timestamp = new Date().toLocaleString()
+
+    await sendAuthAttemptNotificationToTelegram({
+      email: data.email,
+      attemptType: data.loginAttemptType,
+      browser: data.browserInfo?.browser || "Unknown",
+      device: data.deviceInfo?.deviceType || "Unknown",
+      ipAddress: data.ipAddress,
+      errorMessage: data.errorMessage,
+      timestamp,
+    })
+
+    if (suspicious && suspiciousReason) {
+      await sendSuspiciousActivityNotificationToTelegram({
+        email: data.email,
+        reason: suspiciousReason,
+        ipAddress: data.ipAddress,
+        browser: data.browserInfo?.browser,
+        device: data.deviceInfo?.deviceType,
+        timestamp,
+      })
+
       console.warn(
         `[v0] Suspicious activity detected for ${data.email}: ${suspiciousReason}`,
       )
